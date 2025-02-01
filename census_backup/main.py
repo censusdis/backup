@@ -93,18 +93,21 @@ def do_backup(
         logger.info(f"Geography must contain: {geos}")
 
     for geo in ced.geographies(dataset, vintage):
-        skip = not all(g in geo for g in geos)
-        if skip:
-            logger.info(f"Skipping {geo} due to mismatch with {geos}.")
-            continue
-        skip = geo[-1] != end_geo
-        if skip:
-            logger.info(f"Skipping {geo} due to mismatch with {end_geo}.")
-            continue
-        excluded = [g for g in exclude_geographies if g in geo]
-        if excluded:
-            logger.info(f"Skipping {geo} due to excluded components {excluded}")
-            continue
+        if geos:
+            skip = not all(g in geo for g in geos)
+            if skip:
+                logger.info(f"Skipping {geo} due to mismatch with {geos}.")
+                continue
+        if end_geo:
+            skip = geo[-1] != end_geo
+            if skip:
+                logger.info(f"Skipping {geo} due to mismatch with {end_geo}.")
+                continue
+        if exclude_geographies:
+            excluded = [g for g in exclude_geographies if g in geo]
+            if excluded:
+                logger.info(f"Skipping {geo} due to excluded components {excluded}")
+                continue
 
         logger.info(f"Geography: {geo}")
         geo_kwargs = {level: "*" for level in geo}
