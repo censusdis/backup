@@ -6,7 +6,7 @@ U.S. Census data.
 ## Installation
 
 ```shell
-pip install census-backup
+pip install census_backup
 ```
 
 ## Usage Examples
