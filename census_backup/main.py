@@ -75,6 +75,9 @@ def do_backup(
     if geographies is None:
         geographies = []
 
+    if exclude_geographies is None:
+        exclude_geographies = []
+
     end_geos = [geo for geo in geographies if geo.startswith("+")]
     if end_geos:
         end_geo = end_geos[0][1:]
