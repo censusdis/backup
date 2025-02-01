@@ -6,6 +6,10 @@ from logging import getLogger
 
 from pathlib import Path
 
+from datetime import datetime
+
+import json
+
 from logargparser import LoggingArgumentParser
 from argparse import BooleanOptionalAction
 
@@ -14,6 +18,8 @@ import pandas as pd
 import censusdis.data as ced
 from censusdis.states import ALL_STATES_DC_AND_PR
 from censusdis import CensusApiException
+
+import census_backup
 
 
 logger = getLogger(__name__)
@@ -61,16 +67,41 @@ def do_backup(
     vintage: int,
     group: str,
     geographies: Iterable[str] | None,
+    exclude_geographies: Iterable[str] | None,
     output_dir: Path,
     api_key: str | None,
 ):
     """Do the backup."""
+    if geographies is None:
+        geographies = []
+
+    end_geos = [geo for geo in geographies if geo.startswith('+')]
+    if end_geos:
+        end_geo = end_geos[0][1:]
+        if len(end_geos) > 1:
+            logger.warning(f"Multiple end geographies {end_geos}. Choosing {end_geo}")
+        logger.info(f"Geography must end in {end_geo}")
+    else:
+        end_geo = None
+
+    geos = [geo for geo in geographies if geo not in end_geos]
+
+    if geos:
+        logger.info(f"Geography must contain: {geos}")
+
     for geo in ced.geographies(dataset, vintage):
-        if geographies:
-            skip = not all(g in geo for g in geographies)
-            if skip:
-                logger.info(f"Skipping {geo} due to mismatch with {geographies}.")
-                continue
+        skip = not all(g in geo for g in geos)
+        if skip:
+            logger.info(f"Skipping {geo} due to mismatch with {geos}.")
+            continue
+        skip = (geo[-1] != end_geo)
+        if skip:
+            logger.info(f"Skipping {geo} due to mismatch with {end_geo}.")
+            continue
+        excluded = [g for g in exclude_geographies if g in geo]
+        if excluded:
+            logger.info(f"Skipping {geo} due to excluded components {excluded}")
+            continue
 
         logger.info(f"Geography: {geo}")
         geo_kwargs = {level: "*" for level in geo}
@@ -113,7 +144,15 @@ def do_backup(
 
 def main():
     """Entry point for backup."""
-    parser = LoggingArgumentParser(logger, prog="backup")
+    prog = "census-backup"
+
+    meta_data = {
+        "census-backup-version": census_backup.version,
+        "start-time": datetime.now().isoformat(),
+        "args": [prog] + [arg for arg in sys.argv[1:]]
+    }
+
+    parser = LoggingArgumentParser(logger, prog=prog)
 
     parser.add_argument(
         "-d", "--dataset", type=str, required=True, help="The data set."
@@ -137,7 +176,21 @@ def main():
         "--geography",
         type=str,
         nargs="*",
-        help="Geography filters. Only download geographies containing these keys.",
+        help="""Geography filters. Only download geographies containing these keys.
+For example, `-G county` will only download geographies that have county among their
+components, like [state, county, tract] and [state, county]. If a + is prepended
+then the geography must end in the components, so `-G +county` will only match
+[state, county], not [state, county, tract]. Multiple values can be passed, like
+`-G state county` or `-G state +county`. See also -X.
+""",
+    )
+
+    parser.add_argument(
+        '-X',
+        '--exclude-geography',
+        type=str,
+        nargs='*',
+        help="Skip any geography containing this component or components."
     )
 
     parser.add_argument(
@@ -172,17 +225,18 @@ def main():
     if args.output is not None:
         output_dir = Path(args.output)
 
-        if not output_dir.exists():
-            if not dry_run:
-                output_dir.mkdir(parents=True)
-        elif not output_dir.is_dir():
-            logger.error(
-                f"Ouput directory {args.output} exists but is not a directory."
-            )
-            sys.exit(1)
-        if not args.overwrite_ok and any(output_dir.iterdir()):
-            logger.error(f"Ouput directory {args.output} is not empty.")
-            sys.exit(2)
+        if not dry_run:
+            if not output_dir.exists():
+                if not dry_run:
+                    output_dir.mkdir(parents=True)
+            elif not output_dir.is_dir():
+                logger.error(
+                    f"Ouput directory {args.output} exists but is not a directory."
+                )
+                sys.exit(1)
+            if not args.overwrite_ok and any(output_dir.iterdir()):
+                logger.error(f"Ouput directory {args.output} is not empty.")
+                sys.exit(2)
     else:
         output_dir = Path.cwd()
 
@@ -190,12 +244,19 @@ def main():
     vintage = args.vintage
     group = args.group
     geographies = args.geography
+    exclude_geographies = args.exclude_geography
 
     logger.info(f"Backing up {group} {dataset} {vintage} into {output_dir}.")
 
     api_key = args.api_key
 
-    do_backup(dataset, vintage, group, geographies, output_dir, api_key)
+    do_backup(dataset, vintage, group, geographies, exclude_geographies, output_dir, api_key)
+
+    meta_data['end-time'] = datetime.now().isoformat()
+
+    if not dry_run:
+        with open(output_dir / "metadata.json", "w") as meta_data_file:
+            json.dump(meta_data, meta_data_file, indent=2)
 
 
 if __name__ == "__main__":
