@@ -1,9 +1,7 @@
 # censusdis/backup
 
 This project is a command-line utility for bulk downloads of 
-U.S. Census data. Documentation and examples are a little sparse,
-but we wanted to get this out so people who know what data sets
-and vintages they are interested in can start using it. 
+U.S. Census data.
 
 ## Installation
 
@@ -185,6 +183,22 @@ The metadata file has other relevant information like the version of
 `census-backup` that created it, the time it started and ended—that's
 how we knew it took about 20 minutes—and the command-line arguments
 that were used.
+
+### Download multiple groups
+
+Sometimes we want to download several groups of variables at once. To
+do so, all we have to do is give multiple values to the `-g` argument.
+For example,
+
+```shell
+census-backup -d dec/pl -v 2020 -g H1 P1 P2 P3 P4 P5 -G +block -o ~/tmp/decpl2020 --log INFO
+```
+
+This downloads six different groups from the decennial public law data set that
+is used to apportion congressional districts among the states. This ends up being a lot of
+columns. This command also used `-G +block` to download data at the block level,
+which is the smallest level any census data sets are aggregated over. `dec/pl` is one
+of the few data sets available at this fine a geography.
 
 ### Download geometries that have `state` as a component
 
