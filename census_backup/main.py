@@ -74,7 +74,7 @@ def _download(
 def do_backup(
     dataset: str,
     vintage: int,
-    group: str,
+    groups: Iterable[str],
     geographies: Iterable[str] | None,
     exclude_geographies: Iterable[str] | None,
     output_dir: Path,
@@ -133,7 +133,7 @@ def do_backup(
 
                     geo_kwargs["county"] = counties
 
-                    df = _download(dataset, vintage, group=group, **geo_kwargs)
+                    df = _download(dataset, vintage, group=groups, **geo_kwargs)
 
                     path = output_dir / f"state={state}" / "county"
                     for level in geo[:-1]:
@@ -141,7 +141,7 @@ def do_backup(
                             path = path / level
                     _write(df, path, f"{geo[-1]}.csv")
                 else:
-                    df = _download(dataset, vintage, group=group, **geo_kwargs)
+                    df = _download(dataset, vintage, group=groups, **geo_kwargs)
 
                     path = output_dir / f"state={state}"
                     for level in geo[:-1]:
@@ -152,7 +152,7 @@ def do_backup(
             path = output_dir
             for level in geo[:-1]:
                 path = path / level
-            df = _download(dataset, vintage, group=group, **geo_kwargs)
+            df = _download(dataset, vintage, group=groups, **geo_kwargs)
 
             _write(df, path, f"{geo[-1]}.csv")
 
@@ -176,7 +176,7 @@ def main():
     parser.add_argument("-v", "--vintage", type=int, required=True, help="The vintage.")
 
     parser.add_argument(
-        "-g", "--group", type=str, required=True, help="The group of variables."
+        "-g", "--group", type=str, nargs='+', help="The group or groups of variables."
     )
 
     parser.add_argument(
@@ -257,26 +257,29 @@ then the geography must end in the components, so `-G +county` will only match
 
     dataset = args.dataset
     vintage = args.vintage
-    group = args.group
+    groups = args.group
     geographies = args.geography
     exclude_geographies = args.exclude_geography
 
     meta_data["dataset"] = dataset
-    meta_data["group"] = group
+    meta_data["group"] = groups
     meta_data["vintage"] = vintage
 
-    df_variables = ced.variables.search(
-        dataset=dataset, vintage=vintage, group_name=group, skip_annotations=False
+    df_variables = pd.concat(
+        ced.variables.search(
+            dataset=dataset, vintage=vintage, group_name=group, skip_annotations=False
+        )
+        for group in groups
     )
 
     meta_data["vatiables"] = df_variables.to_dict(orient="records")
 
-    logger.info(f"Backing up {group} {dataset} {vintage} into {output_dir}.")
+    logger.info(f"Backing up {groups} {dataset} {vintage} into {output_dir}.")
 
     api_key = args.api_key
 
     do_backup(
-        dataset, vintage, group, geographies, exclude_geographies, output_dir, api_key
+        dataset, vintage, groups, geographies, exclude_geographies, output_dir, api_key
     )
 
     meta_data["end-time"] = datetime.now(timezone.utc).isoformat()
