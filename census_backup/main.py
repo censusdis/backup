@@ -39,34 +39,30 @@ def _write(df: pd.DataFrame | None, path: Path, file_name: str):
 
 
 def _download(
-        dataset: str,
-        vintage: int,
-        group: str,
-        ignore_errors: bool = True,
-        **kwargs
+    dataset: str, vintage: int, group: str, ignore_errors: bool = True, **kwargs
 ) -> pd.DataFrame:
     if dry_run:
         return pd.DataFrame()
 
     if ignore_errors:
         try:
-            df = ced.download(dataset, vintage, ['NAME'], group=group, **kwargs)
+            df = ced.download(dataset, vintage, ["NAME"], group=group, **kwargs)
         except CensusApiException as e:
             logger.warning(f"Ignoring error {e}")
             return None
     else:
-        df = ced.download(dataset, vintage, ['NAME'], group=group, **kwargs)
+        df = ced.download(dataset, vintage, ["NAME"], group=group, **kwargs)
 
     return df
 
 
 def do_backup(
-    dataset: str, 
-    vintage: int, 
+    dataset: str,
+    vintage: int,
     group: str,
     geographies: Iterable[str] | None,
-    output_dir: Path, 
-    api_key: str | None
+    output_dir: Path,
+    api_key: str | None,
 ):
     """Do the backup."""
     for geo in ced.geographies(dataset, vintage):
@@ -137,11 +133,11 @@ def main():
     )
 
     parser.add_argument(
-        '-G',
-        '--geography',
+        "-G",
+        "--geography",
         type=str,
-        nargs='*',
-        help="Geography filters. Only download geographies containing these keys."
+        nargs="*",
+        help="Geography filters. Only download geographies containing these keys.",
     )
 
     parser.add_argument(
@@ -156,14 +152,16 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Dry run only.")
 
     parser.add_argument(
-        '--ignore-errors', action=BooleanOptionalAction, default=True,
-        help="Ignore download errors and just continue on."
+        "--ignore-errors",
+        action=BooleanOptionalAction,
+        default=True,
+        help="Ignore download errors and just continue on.",
     )
 
     parser.add_argument(
-        "--overwrite-ok", 
-        action="store_true", 
-        help="OK to overwrite non-empty directory."
+        "--overwrite-ok",
+        action="store_true",
+        help="OK to overwrite non-empty directory.",
     )
 
     args = parser.parse_args()
@@ -183,9 +181,7 @@ def main():
             )
             sys.exit(1)
         if not args.overwrite_ok and any(output_dir.iterdir()):
-            logger.error(
-                f"Ouput directory {args.output} is not empty."
-            )
+            logger.error(f"Ouput directory {args.output} is not empty.")
             sys.exit(2)
     else:
         output_dir = Path.cwd()
