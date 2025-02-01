@@ -1,7 +1,9 @@
 # censusdis/backup
 
 This project is a command-line utility for bulk downloads of 
-U.S. Census data.
+U.S. Census data. Documentation and examples are a little sparse,
+but we wanted to get this out so people who know what data sets
+and vintages they are interested in can start using it. 
 
 ## Installation
 
@@ -10,6 +12,12 @@ pip install census_backup
 ```
 
 ## Usage Examples
+
+### General help and overview
+
+```shell
+census-backup --help
+```
 
 ### Download from a group across all available bulk geographies
 
