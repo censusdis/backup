@@ -75,7 +75,7 @@ def do_backup(
     if geographies is None:
         geographies = []
 
-    end_geos = [geo for geo in geographies if geo.startswith('+')]
+    end_geos = [geo for geo in geographies if geo.startswith("+")]
     if end_geos:
         end_geo = end_geos[0][1:]
         if len(end_geos) > 1:
@@ -94,7 +94,7 @@ def do_backup(
         if skip:
             logger.info(f"Skipping {geo} due to mismatch with {geos}.")
             continue
-        skip = (geo[-1] != end_geo)
+        skip = geo[-1] != end_geo
         if skip:
             logger.info(f"Skipping {geo} due to mismatch with {end_geo}.")
             continue
@@ -149,7 +149,7 @@ def main():
     meta_data = {
         "census-backup-version": census_backup.version,
         "start-time": datetime.now().isoformat(),
-        "args": [prog] + [arg for arg in sys.argv[1:]]
+        "args": [prog] + [arg for arg in sys.argv[1:]],
     }
 
     parser = LoggingArgumentParser(logger, prog=prog)
@@ -186,11 +186,11 @@ then the geography must end in the components, so `-G +county` will only match
     )
 
     parser.add_argument(
-        '-X',
-        '--exclude-geography',
+        "-X",
+        "--exclude-geography",
         type=str,
-        nargs='*',
-        help="Skip any geography containing this component or components."
+        nargs="*",
+        help="Skip any geography containing this component or components.",
     )
 
     parser.add_argument(
@@ -250,9 +250,11 @@ then the geography must end in the components, so `-G +county` will only match
 
     api_key = args.api_key
 
-    do_backup(dataset, vintage, group, geographies, exclude_geographies, output_dir, api_key)
+    do_backup(
+        dataset, vintage, group, geographies, exclude_geographies, output_dir, api_key
+    )
 
-    meta_data['end-time'] = datetime.now().isoformat()
+    meta_data["end-time"] = datetime.now().isoformat()
 
     if not dry_run:
         with open(output_dir / "metadata.json", "w") as meta_data_file:
