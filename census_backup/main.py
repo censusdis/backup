@@ -6,7 +6,7 @@ from logging import getLogger
 
 from pathlib import Path
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import json
 
@@ -52,12 +52,21 @@ def _download(
 
     if ignore_errors:
         try:
-            df = ced.download(dataset, vintage, ["NAME"], group=group, **kwargs)
+            df = ced.download(
+                dataset,
+                vintage,
+                ["NAME"],
+                group=group,
+                skip_annotations=False,
+                **kwargs,
+            )
         except CensusApiException as e:
             logger.warning(f"Ignoring error {e}")
             return None
     else:
-        df = ced.download(dataset, vintage, ["NAME"], group=group, **kwargs)
+        df = ced.download(
+            dataset, vintage, ["NAME"], group=group, skip_annotations=False, **kwargs
+        )
 
     return df
 
@@ -154,7 +163,7 @@ def main():
 
     meta_data = {
         "census-backup-version": census_backup.version,
-        "start-time": datetime.now().isoformat(),
+        "start-time": datetime.now(timezone.utc).isoformat(),
         "args": [prog] + [arg for arg in sys.argv[1:]],
     }
 
@@ -252,6 +261,16 @@ then the geography must end in the components, so `-G +county` will only match
     geographies = args.geography
     exclude_geographies = args.exclude_geography
 
+    meta_data["dataset"] = dataset
+    meta_data["group"] = group
+    meta_data["vintage"] = vintage
+
+    df_variables = ced.variables.search(
+        dataset=dataset, vintage=vintage, group_name=group, skip_annotations=False
+    )
+
+    meta_data["vatiables"] = df_variables.to_dict(orient="records")
+
     logger.info(f"Backing up {group} {dataset} {vintage} into {output_dir}.")
 
     api_key = args.api_key
@@ -260,7 +279,7 @@ then the geography must end in the components, so `-G +county` will only match
         dataset, vintage, group, geographies, exclude_geographies, output_dir, api_key
     )
 
-    meta_data["end-time"] = datetime.now().isoformat()
+    meta_data["end-time"] = datetime.now(timezone.utc).isoformat()
 
     if not dry_run:
         with open(output_dir / "metadata.json", "w") as meta_data_file:
