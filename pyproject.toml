@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "census_backup"
-version = "0.1.7"
+version = "0.1.8"
 description = "Backup utilities."
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"

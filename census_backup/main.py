@@ -41,7 +41,7 @@ def _write(df: pd.DataFrame | None, path: Path, file_name: str):
             logger.info(f"Dry run: not writing ouput: {file}")
         else:
             logger.info(f"Writing ouput: {file}")
-            df.to_csv(file)
+            df.to_csv(file, index=False)
 
 
 def _download(
