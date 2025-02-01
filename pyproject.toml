@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "census_backup"
-version = "0.1.4"
+version = "0.1.5"
 description = "Backup utilities."
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
@@ -21,7 +21,7 @@ mypy = "^0.971"
 types-requests = "^2.28.10"
 
 [tool.poetry.scripts]
-census-backup = "census_backup:main"
+census-backup = "census_backup.main:main"
 
 [build-system]
 requires = ["poetry-core"]
