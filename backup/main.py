@@ -1,15 +1,19 @@
 """Main entry point for backup."""
 
+import sys
+from typing import Iterable
 from logging import getLogger
 
 from pathlib import Path
 
 from logargparser import LoggingArgumentParser
+from argparse import BooleanOptionalAction
 
 import pandas as pd
 
 import censusdis.data as ced
 from censusdis.states import ALL_STATES_DC_AND_PR
+from censusdis import CensusApiException
 
 
 logger = getLogger(__name__)
@@ -18,33 +22,60 @@ logger = getLogger(__name__)
 dry_run = False
 
 
-def _write(df: pd.DataFrame, path: Path, file_name: str):
-    if not dry_run:
-        path.mkdir(exist_ok=True, parents=True)
-
-    file = path / file_name
-
-    if dry_run:
-        logger.info(f"Dry run: not writing ouput: {file}")
+def _write(df: pd.DataFrame | None, path: Path, file_name: str):
+    if df is None:
+        logger.info("Not writing df because it was not loaded.")
     else:
-        logger.info(f"Writing ouput: {file}")
-        df.to_csv(file)
+        if not dry_run:
+            path.mkdir(exist_ok=True, parents=True)
+
+        file = path / file_name
+
+        if dry_run:
+            logger.info(f"Dry run: not writing ouput: {file}")
+        else:
+            logger.info(f"Writing ouput: {file}")
+            df.to_csv(file)
 
 
-def _download(dataset: str, vintage: int, group: str, **kwargs) -> pd.DataFrame:
+def _download(
+        dataset: str,
+        vintage: int,
+        group: str,
+        ignore_errors: bool = True,
+        **kwargs
+) -> pd.DataFrame:
     if dry_run:
         return pd.DataFrame()
 
-    df = ced.download(dataset, vintage, group=group, **kwargs)
+    if ignore_errors:
+        try:
+            df = ced.download(dataset, vintage, ['NAME'], group=group, **kwargs)
+        except CensusApiException as e:
+            logger.warning(f"Ignoring error {e}")
+            return None
+    else:
+        df = ced.download(dataset, vintage, ['NAME'], group=group, **kwargs)
 
     return df
 
 
 def do_backup(
-    dataset: str, vintage: int, group: str, output_dir: Path, api_key: str | None
+    dataset: str, 
+    vintage: int, 
+    group: str,
+    geographies: Iterable[str] | None,
+    output_dir: Path, 
+    api_key: str | None
 ):
     """Do the backup."""
     for geo in ced.geographies(dataset, vintage):
+        if geographies:
+            skip = not all(g in geo for g in geographies)
+            if skip:
+                logger.info(f"Skipping {geo} due to mismatch with {geographies}.")
+                continue
+
         logger.info(f"Geography: {geo}")
         geo_kwargs = {level: "*" for level in geo}
 
@@ -56,16 +87,17 @@ def do_backup(
                     df_counties = ced.download(
                         dataset, vintage, ["NAME"], state=state, county="*"
                     )
-                    for county in df_counties["COUNTY"]:
-                        geo_kwargs["county"] = county
+                    counties = [county for county in df_counties["COUNTY"]]
 
-                        df = _download(dataset, vintage, group=group, **geo_kwargs)
+                    geo_kwargs["county"] = counties
 
-                        path = output_dir / f"state={state}" / f"county={county}"
-                        for level in geo[:-1]:
-                            if level not in ["state", "county"]:
-                                path = path / level
-                        _write(df, path, f"{geo[-1]}.csv")
+                    df = _download(dataset, vintage, group=group, **geo_kwargs)
+
+                    path = output_dir / f"state={state}" / "county"
+                    for level in geo[:-1]:
+                        if level not in ["state", "county"]:
+                            path = path / level
+                    _write(df, path, f"{geo[-1]}.csv")
                 else:
                     df = _download(dataset, vintage, group=group, **geo_kwargs)
 
@@ -105,6 +137,14 @@ def main():
     )
 
     parser.add_argument(
+        '-G',
+        '--geography',
+        type=str,
+        nargs='*',
+        help="Geography filters. Only download geographies containing these keys."
+    )
+
+    parser.add_argument(
         "--api-key",
         type=str,
         help="Optional API key. Alternatively, store your key in "
@@ -114,6 +154,17 @@ def main():
     )
 
     parser.add_argument("--dry-run", action="store_true", help="Dry run only.")
+
+    parser.add_argument(
+        '--ignore-errors', action=BooleanOptionalAction, default=True,
+        help="Ignore download errors and just continue on."
+    )
+
+    parser.add_argument(
+        "--overwrite-ok", 
+        action="store_true", 
+        help="OK to overwrite non-empty directory."
+    )
 
     args = parser.parse_args()
 
@@ -130,18 +181,25 @@ def main():
             logger.error(
                 f"Ouput directory {args.output} exists but is not a directory."
             )
+            sys.exit(1)
+        if not args.overwrite_ok and any(output_dir.iterdir()):
+            logger.error(
+                f"Ouput directory {args.output} is not empty."
+            )
+            sys.exit(2)
     else:
         output_dir = Path.cwd()
 
     dataset = args.dataset
     vintage = args.vintage
     group = args.group
+    geographies = args.geography
 
     logger.info(f"Backing up {group} {dataset} {vintage} into {output_dir}.")
 
     api_key = args.api_key
 
-    do_backup(dataset, vintage, group, output_dir, api_key)
+    do_backup(dataset, vintage, group, geographies, output_dir, api_key)
 
 
 if __name__ == "__main__":

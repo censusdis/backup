@@ -19,6 +19,8 @@ pylint = "^2.15.2"
 mypy = "^0.971"
 types-requests = "^2.28.10"
 
+[tool.poetry.scripts]
+census-backup = "backup:main"
 
 [build-system]
 requires = ["poetry-core"]
