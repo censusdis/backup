@@ -1,7 +1,7 @@
 """Main entry point for backup."""
 
 import sys
-from typing import Iterable
+from typing import Iterable, Optional
 from logging import getLogger
 
 from pathlib import Path
@@ -45,7 +45,12 @@ def _write(df: pd.DataFrame | None, path: Path, file_name: str):
 
 
 def _download(
-    dataset: str, vintage: int, group: str, ignore_errors: bool = True, **kwargs
+    dataset: str,
+    vintage: int,
+    group: str,
+    ignore_errors: bool = True,
+    api_key: Optional[str] = None,
+    **kwargs
 ) -> pd.DataFrame:
     if dry_run:
         return pd.DataFrame()
@@ -58,6 +63,7 @@ def _download(
                 ["NAME"],
                 group=group,
                 skip_annotations=False,
+                api_key=api_key,
                 **kwargs,
             )
         except CensusApiException as e:
@@ -65,7 +71,7 @@ def _download(
             return None
     else:
         df = ced.download(
-            dataset, vintage, ["NAME"], group=group, skip_annotations=False, **kwargs
+            dataset, vintage, ["NAME"], group=group, skip_annotations=False, api_key=api_key, **kwargs
         )
 
     return df
@@ -78,7 +84,7 @@ def do_backup(
     geographies: Iterable[str] | None,
     exclude_geographies: Iterable[str] | None,
     output_dir: Path,
-    api_key: str | None,
+    api_key: Optional[str],
 ):
     """Do the backup."""
     if geographies is None:
@@ -127,13 +133,13 @@ def do_backup(
 
                 if "county" in geo and len(geo) > 2:
                     df_counties = ced.download(
-                        dataset, vintage, ["NAME"], state=state, county="*"
+                        dataset, vintage, ["NAME"], api_key=api_key, state=state, county="*"
                     )
                     counties = [county for county in df_counties["COUNTY"]]
 
                     geo_kwargs["county"] = counties
 
-                    df = _download(dataset, vintage, group=groups, **geo_kwargs)
+                    df = _download(dataset, vintage, group=groups, api_key=api_key, **geo_kwargs)
 
                     path = output_dir / f"state={state}" / "county"
                     for level in geo[:-1]:
@@ -141,7 +147,7 @@ def do_backup(
                             path = path / level
                     _write(df, path, f"{geo[-1]}.csv")
                 else:
-                    df = _download(dataset, vintage, group=groups, **geo_kwargs)
+                    df = _download(dataset, vintage, group=groups, api_key=api_key, **geo_kwargs)
 
                     path = output_dir / f"state={state}"
                     for level in geo[:-1]:
@@ -152,7 +158,7 @@ def do_backup(
             path = output_dir
             for level in geo[:-1]:
                 path = path / level
-            df = _download(dataset, vintage, group=groups, **geo_kwargs)
+            df = _download(dataset, vintage, group=groups, api_key=api_key, **geo_kwargs)
 
             _write(df, path, f"{geo[-1]}.csv")
 
